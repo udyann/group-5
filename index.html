@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Google Maps with GeoJSON</title>
+    <style>
+      /* Set the size of the map container */
+      #map {
+        height: 100vh;
+        width: 100%;
+      }
+    </style>
+    <!-- Include the Google Maps JavaScript API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBTLwgOkAdeBGnGlxtDKA4WKBOiKrADq5g&loading=async&libraries=geometry,places,marker"></script>
+    <script>
+      let map;
+      const g_api_key = "API_KEY";
+      const marker_colors = [
+        "#ffa500",
+        "#faeb36",
+        "#79c314",
+        "#487de7",
+        "#4b369d",
+      ];
+      async function initMap() {
+        // Initialize the map
+        map = new google.maps.Map(document.getElementById("map"), {
+          center: { lat: 37.4885, lng: 127.0359 }, // Centered on Seoul, South Korea
+          zoom: 14,
+          mapId: "DEMO_MAP_ID",
+        });
+
+        try {
+          // Fetch the GeoJSON file
+          const jsonData = JSON.parse(
+            document.getElementById("json-data").textContent
+          );
+          for (j = 0; j < Object.keys(jsonData).length; j++) {
+            // Check if the response is OK
+            if (!response.ok) {
+              throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            // Parse the JSON data
+            const myJson = await response.json();
+
+            // Initialize a single InfoWindow
+            const infowindow = new google.maps.InfoWindow();
+
+            // Set Start and End Markers
+            const startLocation =
+              myJson["routes"][0]["legs"][0]["start_location"];
+            const endLocation = myJson["routes"][0]["legs"][0]["end_location"];
+
+            // Create Start Marker
+            const startMarker = new google.maps.Marker({
+              map,
+              position: startLocation,
+              title: "Start",
+            });
+
+            // Create End Marker
+            const endMarker = new google.maps.Marker({
+              map,
+              position: endLocation,
+              title: "End",
+            });
+
+            // Use the makeInfoWindowEvent function for start and end markers
+            makeInfoWindowEvent(
+              map,
+              infowindow,
+              `<div><strong>Start Location</strong><br>Lat: ${startLocation.lat}<br>Lng: ${startLocation.lng}</div>`,
+              startMarker
+            );
+
+            makeInfoWindowEvent(
+              map,
+              infowindow,
+              `<div><strong>End Location</strong><br>Lat: ${endLocation.lat}<br>Lng: ${endLocation.lng}</div>`,
+              endMarker
+            );
+
+            // Process the GeoJSON data
+            const stepsCount = myJson["routes"][0]["legs"][0]["steps"].length;
+
+            for (let i = 0; i < stepsCount; i++) {
+              const step = myJson["routes"][0]["legs"][0]["steps"][i];
+
+              const isTransfer =
+                step["start_location"].lat === step["end_location"].lat &&
+                step["start_location"].lng === step["end_location"].lng;
+
+              // Handle transfers separately
+              if (isTransfer) {
+                nextStep = myJson["routes"][0]["legs"][0]["steps"][i + 1];
+                // Create a marker for transfer point
+                const transferMarker = new google.maps.Marker({
+                  position: step["start_location"],
+                  map: map,
+                  icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 10,
+                    fillColor: "#FFA500",
+                    fillOpacity: 1,
+                    strokeColor: "#FFFFFF",
+                    strokeWeight: 2,
+                  },
+                  title: `Transfer Point at ${nextStep["transit_details"]["line"]["short_name"]}`,
+                });
+
+                makeInfoWindowEvent(
+                  map,
+                  infowindow,
+                  `
+                  <div>
+                    <strong>Transfer Point</strong><br>
+                    Transfer to: ${nextStep["transit_details"]["line"]["short_name"]}<br>
+                    Arrival Stop: ${nextStep["transit_details"]["arrival_stop"]["name"]}<br>
+                  </div>`,
+                  transferMarker
+                );
+                continue; // Skip drawing the line for this transfer step
+              }
+
+              let color;
+
+              if (step["travel_mode"] == "WALKING") {
+                color = "#DC143C";
+              } else if (step["travel_mode"] == "TRANSIT") {
+                color = step["transit_details"]["line"]["color"];
+              }
+
+              const decodedPath = google.maps.geometry.encoding.decodePath(
+                step["polyline"]["points"]
+              );
+
+              // Add a marker at the middle of each step
+              const pinBackground = new google.maps.marker.PinElement({
+                background: marker_colors[j],
+                borderColor: marker_colors[j],
+                glyph: "",
+              });
+
+              mid_path = Math.floor(decodedPath.length / 2);
+              pos = decodedPath[mid_path];
+
+              const stepMarker = new google.maps.marker.AdvancedMarkerElement({
+                position: pos,
+                map: map,
+                content: pinBackground.element,
+              });
+
+              // Use the makeInfoWindowEvent function for step markers
+              makeInfoWindowEvent(
+                map,
+                infowindow,
+                `
+                <div>
+                  <strong>${step["travel_mode"]}</strong><br>
+                  Duration: ${step["duration"]["text"]}<br>
+                  ${
+                    step["travel_mode"] === "TRANSIT"
+                      ? `Line: ${step["transit_details"]["line"]["short_name"]}`
+                      : ""
+                  }<br>
+                  ${
+                    step["travel_mode"] === "TRANSIT"
+                      ? `Stations: ${step["transit_details"]["num_stops"]}`
+                      : ""
+                  }
+                </div>`,
+                stepMarker
+              );
+
+              // Draw the polyline on the map
+
+              const path = new google.maps.Polyline({
+                path: decodedPath,
+                geodesic: true,
+                strokeWeight: 4,
+                strokeColor: color,
+                strokeOpacity: 1,
+              });
+              path.setMap(map);
+            }
+          }
+        } catch (error) {
+          console.error("Error loading GeoJSON:", error);
+        }
+      }
+      function makeInfoWindowEvent(map, infowindow, contentString, marker) {
+        google.maps.event.addListener(marker, "click", function () {
+          infowindow.setContent(contentString);
+          infowindow.open(map, marker);
+        });
+      }
+    </script>
+  </head>
+  <body onload="initMap()">
+    <div id="map"></div>
+  </body>
+</html>
