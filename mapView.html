@@ -10,35 +10,75 @@
       }
     </style>
     <!-- Include the Google Maps JavaScript API -->
-    <script src=""></script>
-    <form action="/examples/media/action_target.php" method="get">
-    </form>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBTLwgOkAdeBGnGlxtDKA4WKBOiKrADq5g&libraries=geometry,places"></script>
+
     <script>
       let map;
+      const g_api_key = "AIzaSyBTLwgOkAdeBGnGlxtDKA4WKBOiKrADq5g";
+      const marker_colors = [
+        "#ffa500",
+        "#faeb36",
+        "#79c314",
+        "#487de7",
+        "#4b369d",
+      ];
       async function initMap() {
         // Initialize the map
         try {
           // Fetch the GeoJSON file
-          const jsonData = JSON.parse(document.getElementById('json-data').textContent);
-        
+          const jsonData = JSON.parse(
+            document.getElementById("json-data").textContent
+          );
+
           // Check if the response is OK
           if (!jsonData) {
             throw new Error(`HTTP error! Status: ${jsonData.status}`);
           }
-        
-        short = jsonData['routes'][0]['bounds']
-        c_lat = (short['northeast']['lat'] + short['southwest']['lat'])/2
-        c_lng = (short['northeast']['lng'] + short['southwest']['lng'])/2
-        para_zoom = (jsonData['routes'][0]['legs'][0]['distance']['value'] - 800)/1000
-        if(para_zoom <= 0){
-          para_zoom = 0.01
-        }
-        c_zoom = 16 - Math.floor(Math.sqrt(para_zoom))
 
-        map = new google.maps.Map(document.getElementById("map"), {
-          center: { lat: c_lat, lng: c_lng },
-          zoom: c_zoom,
-        });
+          short = jsonData["routes"][0]["bounds"];
+          c_lat = (short["northeast"]["lat"] + short["southwest"]["lat"]) / 2;
+          c_lng = (short["northeast"]["lng"] + short["southwest"]["lng"]) / 2;
+          para_zoom =
+            (jsonData["routes"][0]["legs"][0]["distance"]["value"] - 800) /
+            1000;
+          if (para_zoom <= 0) {
+            para_zoom = 0.01;
+          }
+          c_zoom = 16 - Math.floor(Math.sqrt(para_zoom));
+
+          map = new google.maps.Map(document.getElementById("map"), {
+            center: { lat: c_lat, lng: c_lng },
+            zoom: c_zoom,
+            mapId: "DEMO_MAP_ID",
+          });
+
+          const startLocation =
+            jsonData["routes"][0]["legs"][0]["start_location"];
+          const endLocation = myJson["routes"][0]["legs"][0]["end_location"];
+
+          const startMarker = new google.maps.Marker({
+            map,
+            position: startLocation,
+            title: "Start",
+          });
+          // Create End Marker
+          const endMarker = new google.maps.Marker({
+            map,
+            position: endLocation,
+            title: "End",
+          });
+          makeInfoWindowEvent(
+            map,
+            infowindow,
+            `<div><strong>Start Location</strong><br>Lat: ${startLocation.lat}<br>Lng: ${startLocation.lng}</div>`,
+            startMarker
+          );
+          makeInfoWindowEvent(
+            map,
+            infowindow,
+            `<div><strong>End Location</strong><br>Lat: ${endLocation.lat}<br>Lng: ${endLocation.lng}</div>`,
+            endMarker
+          );
 
           // Process the GeoJSON data
           const stepsCount = jsonData["routes"][0]["legs"][0]["steps"].length;
@@ -53,21 +93,49 @@
             }
             console.log(color);
 
-            if(jsonData['routes'][0]['copyrights'] == "Map data \u00a92024 TMap Mobility"){
+            if (
+              jsonData["routes"][0]["copyrights"] ==
+              "Map data \u00a92024 TMap Mobility"
+            ) {
               const decodedPath = google.maps.geometry.encoding.decodePath(
                 step["polyline"]["points"]
               );
               console.log(decodedPath);
               // Draw the polyline on the map
-              const overall = new google.maps.Polyline({
-                path: google.maps.geometry.encoding.decodePath(
-                  jsonData["routes"][0]["overview_polyline"]["points"]
-                ),
-                strokeOpacity: 1,
-                strokeWeight: 4,
-                strokeColor: "#DC143C",
+
+              const pinBackground = new google.maps.marker.PinElement({
+                background: marker_colors[j],
+                borderColor: marker_colors[j],
+                glyph: "",
               });
-              //overall.setMap(map);
+              mid_path = Math.floor(decodedPath.length / 2);
+              pos = decodedPath[mid_path];
+              const stepMarker = new google.maps.marker.AdvancedMarkerElement({
+                position: pos,
+                map: map,
+                content: pinBackground.element,
+              });
+              // Use the makeInfoWindowEvent function for step markers
+              makeInfoWindowEvent(
+                map,
+                infowindow,
+                `
+                <div>
+                  <strong>${step["travel_mode"]}</strong><br>
+                  Duration: ${step["duration"]["text"]}<br>
+                  ${
+                    step["travel_mode"] === "TRANSIT"
+                      ? `Line: ${step["transit_details"]["line"]["short_name"]}`
+                      : ""
+                  }<br>
+                  ${
+                    step["travel_mode"] === "TRANSIT"
+                      ? `Stations: ${step["transit_details"]["num_stops"]}`
+                      : ""
+                  }
+                </div>`,
+                stepMarker
+              );
 
               //if(jsonData['routes'][0]['copyrights']=='True')
               const path = new google.maps.Polyline({
@@ -79,23 +147,28 @@
               });
 
               path.setMap(map);
-            }
-            else{
+            } else {
               const walk_path = [
-                { lat: step['start_location']['lat'], lng: step['start_location']['lng'] },
-                { lat: step['end_location']['lat'], lng: step['end_location']['lng'] }
+                {
+                  lat: step["start_location"]["lat"],
+                  lng: step["start_location"]["lng"],
+                },
+                {
+                  lat: step["end_location"]["lat"],
+                  lng: step["end_location"]["lng"],
+                },
               ];
+
               const walkpath = new google.maps.Polyline({
                 path: walk_path,
                 geodesic: true,
                 strokeWeight: 4,
-                strokeColor: '#DC143C',
+                strokeColor: "#DC143C",
                 strokeOpacity: 1,
               });
-              
+
               walkpath.setMap(map);
             }
-            
           }
           // Add an info window
           const infoWindow = new google.maps.InfoWindow();
