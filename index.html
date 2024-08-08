@@ -10,10 +10,11 @@
       }
     </style>
     <!-- Include the Google Maps JavaScript API -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=API_KEY&loading=async&libraries=geometry,places,marker"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyABtxrt-npSKeHE1BCChCxuk7ju05M3LRg&loading=async&libraries=geometry,places,marker"></script>
+    <script id="json-data" type="application/json"></script>
     <script>
       let map;
-      const g_api_key = "API_KEY";
+      const g_api_key = "AIzaSyABtxrt-npSKeHE1BCChCxuk7ju05M3LRg";
       const marker_colors = [
         "#ffa500",
         "#faeb36",
@@ -23,25 +24,23 @@
       ];
       async function initMap() {
         // Initialize the map
-        map = new google.maps.Map(document.getElementById("map"), {
-          center: { lat: 37.4885, lng: 127.0359 }, // Centered on Seoul, South Korea
-          zoom: 14,
-          mapId: "DEMO_MAP_ID",
-        });
 
         try {
           // Fetch the GeoJSON file
           const jsonData = JSON.parse(
             document.getElementById("json-data").textContent
           );
-          for (j = 0; j < Object.keys(jsonData).length; j++) {
-            // Check if the response is OK
-            if (!response.ok) {
-              throw new Error(`HTTP error! Status: ${response.status}`);
-            }
+          console.log("load?");
 
+          map = new google.maps.Map(document.getElementById("map"), {
+            center: jsonData["center"],
+            zoom: 14,
+            mapId: "DEMO_MAP_ID",
+          });
+
+          for (j = 0; j < Object.keys(jsonData).length - 1; j++) {
             // Parse the JSON data
-            const myJson = await response.json();
+            const myJson = jsonData[j];
 
             // Initialize a single InfoWindow
             const infowindow = new google.maps.InfoWindow();
