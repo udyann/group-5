@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Google Maps with GeoJSON</title>
+    <style>
+      /* Set the size of the map container */
+      #map {
+        height: 100vh;
+        width: 100%;
+      }
+    </style>
+    <!-- Include the Google Maps JavaScript API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBTLwgOkAdeBGnGlxtDKA4WKBOiKrADq5g&libraries=geometry,places"></script>
+    <form action="/examples/media/action_target.php" method="get">
+    </form>
+    <script>
+      let map;
+      async function initMap() {
+        // Initialize the map
+        try {
+          // Fetch the GeoJSON file
+          const jsonData = JSON.parse(document.getElementById('json-data').textContent);
+        
+          // Check if the response is OK
+          if (!jsonData) {
+            throw new Error(`HTTP error! Status: ${jsonData.status}`);
+          }
+        
+        short = jsonData['routes'][0]['bounds']
+        c_lat = (short['northeast']['lat'] + short['southwest']['lat'])/2
+        c_lng = (short['northeast']['lng'] + short['southwest']['lng'])/2
+        para_zoom = (jsonData['routes'][0]['legs'][0]['distance']['value'] - 800)/1000
+        if(para_zoom <= 0){
+          para_zoom = 0.01
+        }
+        c_zoom = 16 - Math.floor(Math.sqrt(para_zoom))
+
+        map = new google.maps.Map(document.getElementById("map"), {
+          center: { lat: c_lat, lng: c_lng },
+          zoom: c_zoom,
+        });
+
+          // Process the GeoJSON data
+          const stepsCount = jsonData["routes"][0]["legs"][0]["steps"].length;
+          for (let i = 0; i < stepsCount; i++) {
+            console.log(i);
+            const step = jsonData["routes"][0]["legs"][0]["steps"][i];
+            let color;
+            if (step["travel_mode"] == "WALKING") {
+              color = "#DC143C";
+            } else if (step["travel_mode"] == "TRANSIT") {
+              color = step["transit_details"]["line"]["color"];
+            }
+            console.log(color);
+
+            if(jsonData['routes'][0]['copyrights'] == "Map data \u00a92024 TMap Mobility"){
+              const decodedPath = google.maps.geometry.encoding.decodePath(
+                step["polyline"]["points"]
+              );
+              console.log(decodedPath);
+              // Draw the polyline on the map
+              const overall = new google.maps.Polyline({
+                path: google.maps.geometry.encoding.decodePath(
+                  jsonData["routes"][0]["overview_polyline"]["points"]
+                ),
+                strokeOpacity: 1,
+                strokeWeight: 4,
+                strokeColor: "#DC143C",
+              });
+              //overall.setMap(map);
+
+              //if(jsonData['routes'][0]['copyrights']=='True')
+              const path = new google.maps.Polyline({
+                path: decodedPath,
+                geodesic: true,
+                strokeWeight: 4,
+                strokeColor: color,
+                strokeOpacity: 1,
+              });
+
+              path.setMap(map);
+            }
+            else{
+              const walk_path = [
+                { lat: step['start_location']['lat'], lng: step['start_location']['lng'] },
+                { lat: step['end_location']['lat'], lng: step['end_location']['lng'] }
+              ];
+              const walkpath = new google.maps.Polyline({
+                path: walk_path,
+                geodesic: true,
+                strokeWeight: 4,
+                strokeColor: '#DC143C',
+                strokeOpacity: 1,
+              });
+              
+              walkpath.setMap(map);
+            }
+            
+          }
+          // Add an info window
+          const infoWindow = new google.maps.InfoWindow();
+          // Add click event listener to display info window
+          map.data.addListener("click", function (event) {
+            const feature = event.feature;
+            const content = `
+                        <div>
+                            <h3>Feature Info</h3>
+                            <p><strong>ID:</strong> ${feature.getId()}</p>
+                            <p><strong>Type:</strong> ${feature
+                              .getGeometry()
+                              .getType()}</p>
+                        </div>
+                    `;
+            infoWindow.setContent(content);
+            infoWindow.setPosition(event.latLng);
+            infoWindow.open(map);
+          });
+        } catch (error) {
+          console.error("Error loading GeoJSON:", error);
+        }
+      }
+    </script>
+  </head>
+  <body onload="initMap()">
+    <div id="map"></div>
+    <script id="json-data" type="application/json"></script>
+  </body>
+</html>
